@@ -10,6 +10,12 @@ export const ProofVerificationErrorCode = {
   VERIFIER_UNAVAILABLE: "PROOF_VERIFIER_UNAVAILABLE",
   /** The proof payload itself is structurally invalid. */
   MALFORMED_PROOF: "PROOF_VERIFICATION_MALFORMED",
+  /**
+   * The proof was checked against a different verification key than the one
+   * it was generated for. Distinct from an invalid proof: fix the key or
+   * circuit artifacts, not the witness.
+   */
+  VERIFICATION_KEY_MISMATCH: "PROOF_VERIFICATION_KEY_MISMATCH",
 } as const;
 
 export type ProofVerificationErrorCodeType =

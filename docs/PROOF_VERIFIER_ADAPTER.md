@@ -168,8 +168,22 @@ try {
 | `PROOF_VERIFICATION_FAILED` | The verifier ran but verification could not complete (proof invalid or unexpected error). | no |
 | `PROOF_VERIFIER_UNAVAILABLE` | The verifier could not be reached; the proof was not evaluated. | yes |
 | `PROOF_VERIFICATION_MALFORMED` | The proof payload is structurally invalid. | no |
+| `PROOF_VERIFICATION_KEY_MISMATCH` | The proof was checked against a different verification key than it was generated for. | no |
 
-All three codes are registered in `ERROR_CODE_REGISTRY` and surfaced in
+### Verification key mismatches
+
+A key mismatch is reported separately from an invalid proof. Fix the key or the
+circuit version, not the witness:
+
+- Adapters return `status: "key_mismatch"` (`ProofVerificationStatus.KEY_MISMATCH`),
+  with `isValid: false`.
+- Errors thrown by an adapter whose message names a verification key mismatch
+  are normalized to `PROOF_VERIFICATION_KEY_MISMATCH`.
+- `MockProofVerifierAdapter({ verificationKeyId })` returns `key_mismatch` when
+  `input.verificationKeyId` is set and differs from it.
+- Messages never include key ids or proof values.
+
+All four codes are registered in `ERROR_CODE_REGISTRY` and surfaced in
 [`docs/ERROR_CODES.md`](./ERROR_CODES.md), so `formatRedactedError()` and the
 error-doc generator treat them like every other SDK code.
 

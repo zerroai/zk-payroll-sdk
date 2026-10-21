@@ -732,3 +732,42 @@ describe("Concurrency integration (Issue #65)", () => {
     expect(results).toEqual(["x", "y", "x", "y"]);
   });
 });
+
+// ── Circuit input size validation (before any artifact or proving work) ──────
+
+describe("circuit input size validation", () => {
+  const oversized = { amount: "5000", memo: "1".repeat(500) };
+
+  it("SnarkjsProofGenerator rejects an oversized witness before fetching artifacts", async () => {
+    const generator = new SnarkjsProofGenerator(baseConfig);
+    await expect(generator.generateProof(oversized)).rejects.toMatchObject({
+      code: "PROOF_INPUT_TOO_LARGE",
+    });
+    expect(mockedAxios.get).not.toHaveBeenCalled();
+    expect(groth16.fullProve).not.toHaveBeenCalled();
+  });
+
+  it("does not leak witness values in the rejection", async () => {
+    const generator = new SnarkjsProofGenerator(baseConfig);
+    const error = await generator.generateProof(oversized).catch((e: Error) => e);
+    expect((error as Error).message).not.toContain("5000");
+    expect((error as Error).message).not.toContain("1111");
+  });
+
+  it("honours config.circuitInputLimits", async () => {
+    const generator = new SnarkjsProofGenerator({
+      ...baseConfig,
+      circuitInputLimits: { maxStringLength: 1000 },
+    });
+    await expect(generator.generateProof(oversized)).resolves.toEqual(mockPayload);
+  });
+
+  it("WorkerProofGenerator rejects an oversized witness without posting to the worker", async () => {
+    const worker = new FakeWorker();
+    const generator = new WorkerProofGenerator(worker, baseConfig);
+    await expect(generator.generateProof(oversized)).rejects.toMatchObject({
+      code: "PROOF_INPUT_TOO_LARGE",
+    });
+    expect(worker.sent).toHaveLength(0);
+  });
+});

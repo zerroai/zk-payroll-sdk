@@ -359,3 +359,28 @@ describe("filterActiveViewKeys", () => {
     expect(filterActiveViewKeys(keys)).toHaveLength(2);
   });
 });
+
+describe("issued view key immutability", () => {
+  it("returns a frozen record whose scope cannot be widened", () => {
+    const response = createViewKeyRequest(makeRequest(), "GADMIN");
+    expect(Object.isFrozen(response)).toBe(true);
+    const original = response.scope;
+    expect(() => {
+      (response as { scope: string }).scope = "full-audit";
+    }).toThrow(TypeError);
+    expect(response.scope).toBe(original);
+  });
+
+  it("does not freeze or alter the request it was built from", () => {
+    const request = makeRequest();
+    createViewKeyRequest(request, "GADMIN");
+    expect(Object.isFrozen(request)).toBe(false);
+  });
+
+  it("is enforced by the types (readonly fields)", () => {
+    const response = createViewKeyRequest(makeRequest(), "GADMIN");
+    // @ts-expect-error scope is readonly on an issued view key
+    const assignScope = () => (response.scope = "full-audit");
+    expect(typeof assignScope).toBe("function");
+  });
+});

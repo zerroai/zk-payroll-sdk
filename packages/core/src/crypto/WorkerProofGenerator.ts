@@ -6,6 +6,7 @@ import { IdempotencyRegistry } from "../core/idempotency";
 import { PayrollProgressCallback, PayrollProgressEvent, PayrollProgressStage } from "../progress";
 import { validateProofConfig } from "./configValidation";
 import { sanitizeProofInput } from "./proofInputSanitizer";
+import { assertCircuitInputSize } from "../proofs/circuitInputSize";
 
 /**
  * Options for WorkerProofGenerator.
@@ -249,6 +250,11 @@ export class WorkerProofGenerator implements IProofGenerator {
       );
     }
     const sanitized = sanitizeResult.sanitized!;
+    try {
+      assertCircuitInputSize(sanitized, this.config.circuitInputLimits);
+    } catch (error) {
+      return Promise.reject(error);
+    }
 
     const inner = (): Promise<ProofPayload> =>
       this.dispatch(

@@ -104,8 +104,29 @@ interface ProofGeneratorConfig {
 
   /** Optional cache TTL in seconds for proof results */
   artifactCacheTTL?: number;
+
+  /** Overrides for the witness size limits below */
+  circuitInputLimits?: Partial<CircuitInputLimits>;
 }
 ```
+
+### Circuit Input Size Limits
+
+`generateProof()` (in both `SnarkjsProofGenerator` and `WorkerProofGenerator`)
+checks the witness size before any artifact is fetched or a worker is used. An
+oversized witness is rejected with a `ProofGenerationError` whose code is
+`PROOF_INPUT_TOO_LARGE`. The error context holds `limit`, `max`, `actual` and
+(when relevant) `field`; it never holds witness values.
+
+| Limit | Default | Meaning |
+| --- | --- | --- |
+| `maxFields` | 256 | top-level witness fields |
+| `maxElements` | 4096 | total values across all fields and arrays |
+| `maxDepth` | 4 | nesting depth of arrays/objects in a field |
+| `maxStringLength` | 128 | length of any string value (a BN254 field element is at most 78 digits) |
+| `maxTotalBytes` | 65536 | JSON-serialized witness size |
+
+Use `assertCircuitInputSize(witness, limits?)` to run the same check yourself.
 
 ### Artifact Hosting
 

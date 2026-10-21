@@ -17,6 +17,7 @@ import { Semaphore } from "../core/concurrency";
 import { IdempotencyRegistry } from "../core/idempotency";
 import { validateProofConfig } from "./configValidation";
 import { sanitizeProofInput } from "./proofInputSanitizer";
+import { assertCircuitInputSize } from "../proofs/circuitInputSize";
 
 /**
  * Default max concurrency for `groth16.fullProve`. The snarkjs call is
@@ -103,6 +104,7 @@ export class SnarkjsProofGenerator implements IPreloadableProofGenerator {
       });
     }
     const sanitized = sanitizeResult.sanitized!;
+    assertCircuitInputSize(sanitized, this.config.circuitInputLimits);
 
     try {
       return await this.dedup.execute(witnessKey(sanitized), () =>

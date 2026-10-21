@@ -80,22 +80,26 @@ export interface ViewKey {
 
 /**
  * A successfully created audit view key, ready to hand to an auditor.
+ *
+ * Every field is `readonly`, and {@link createViewKeyRequest} deep-freezes the
+ * returned object: once a grant is issued its `scope` cannot be widened in
+ * place. To change access, revoke the key and issue a new one.
  */
 export interface ViewKeyResponse {
   /** Opaque record identifier (e.g. "vk_1719578400000"). */
-  id: string;
+  readonly id: string;
   /** The shareable key token (e.g. "vk_a3f9bc12de45"). */
-  keyId: string;
-  auditorName: string;
-  auditorOrg: string;
-  scope: ViewKeyScope;
+  readonly keyId: string;
+  readonly auditorName: string;
+  readonly auditorOrg: string;
+  readonly scope: ViewKeyScope;
   /** Stellar public key of the admin who granted the key. */
-  grantedBy: string;
+  readonly grantedBy: string;
   /** ISO-8601 timestamp of creation. */
-  createdAt: string;
+  readonly createdAt: string;
   /** ISO-8601 timestamp of expiry. */
-  expiresAt: string;
-  isActive: boolean;
+  readonly expiresAt: string;
+  readonly isActive: boolean;
 }
 
 /** Input required to revoke an existing audit view key. */
@@ -182,7 +186,7 @@ function resolveKeyStatus(key: ViewKey, now: Date): "active" | "revoked" | "expi
  */
 export function createViewKeyRequest(request: ViewKeyRequest, grantedBy: string): ViewKeyResponse {
   const now = new Date();
-  return {
+  return Object.freeze({
     id: `vk_${now.getTime()}`,
     keyId: generateKeyToken(),
     auditorName: request.auditorName.trim(),
@@ -192,7 +196,7 @@ export function createViewKeyRequest(request: ViewKeyRequest, grantedBy: string)
     createdAt: now.toISOString(),
     expiresAt: request.expiresAt ?? defaultExpiryFromNow(),
     isActive: true,
-  };
+  });
 }
 
 /**

@@ -437,3 +437,54 @@ describe("AUDIT_GRANT_SCOPES", () => {
     expect(AUDIT_GRANT_SCOPES).toEqual(["read-only", "full-audit"]);
   });
 });
+
+// ── Immutability: issued grants and reports cannot be widened in place ──────
+
+describe("immutable grant scopes", () => {
+  it("freezes the report, its arrays and every resolved grant", () => {
+    const report = readEffectiveAuditGrantScope([grant({ scope: "read-only" })], NOW);
+    const entry = report.grantees[0];
+
+    expect(Object.isFrozen(report)).toBe(true);
+    expect(Object.isFrozen(report.grantees)).toBe(true);
+    expect(Object.isFrozen(entry)).toBe(true);
+    expect(Object.isFrozen(entry.grants)).toBe(true);
+    expect(Object.isFrozen(entry.grants[0])).toBe(true);
+    expect(Object.isFrozen(entry.activeGrantIds)).toBe(true);
+  });
+
+  it("rejects an attempt to widen a resolved scope at runtime", () => {
+    const entry = readEffectiveAuditGrantScope([grant({ scope: "read-only" })], NOW).grantees[0];
+    expect(() => {
+      (entry as { scope: string }).scope = "full-audit";
+    }).toThrow(TypeError);
+    expect(() => {
+      (entry.grants[0] as { scope: string }).scope = "full-audit";
+    }).toThrow(TypeError);
+    expect(entry.scope).toBe("read-only");
+  });
+
+  it("rejects changes to the exported scope list", () => {
+    expect(Object.isFrozen(AUDIT_GRANT_SCOPES)).toBe(true);
+    expect(() => {
+      (AUDIT_GRANT_SCOPES as string[]).push("admin");
+    }).toThrow(TypeError);
+    expect([...AUDIT_GRANT_SCOPES]).toEqual(["read-only", "full-audit"]);
+  });
+
+  it("does not mutate or freeze the caller's input grants", () => {
+    const input = grant();
+    readEffectiveAuditGrantScope([input], NOW);
+    expect(Object.isFrozen(input)).toBe(false);
+  });
+
+  it("is enforced by the types (readonly fields)", () => {
+    const entry = readEffectiveAuditGrantScope([grant()], NOW).grantees[0];
+    // @ts-expect-error scope is readonly on an effective grant
+    const assignScope = () => (entry.scope = "full-audit");
+    // @ts-expect-error resolved grants are readonly arrays
+    const pushGrant = () => entry.grants.push(entry.grants[0]);
+    expect(typeof assignScope).toBe("function");
+    expect(typeof pushGrant).toBe("function");
+  });
+});

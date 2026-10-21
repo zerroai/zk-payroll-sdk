@@ -30,13 +30,14 @@ const VALID_PROOF: ProofPayload = {
 };
 
 describe("ProofVerificationStatus — stable typed states", () => {
-  it("exposes exactly the five supported states", () => {
+  it("exposes exactly the six supported states", () => {
     expect(ProofVerificationStatus).toEqual({
       VALID: "valid",
       INVALID: "invalid",
       EXPIRED: "expired",
       UNAVAILABLE: "unavailable",
       MALFORMED: "malformed",
+      KEY_MISMATCH: "key_mismatch",
     });
   });
 
@@ -46,6 +47,9 @@ describe("ProofVerificationStatus — stable typed states", () => {
     expect(proofVerificationMessage(ProofVerificationStatus.EXPIRED)).toMatch(/expired/);
     expect(proofVerificationMessage(ProofVerificationStatus.UNAVAILABLE)).toMatch(/not reachable/);
     expect(proofVerificationMessage(ProofVerificationStatus.MALFORMED)).toMatch(/malformed/);
+    expect(proofVerificationMessage(ProofVerificationStatus.KEY_MISMATCH)).toMatch(
+      /verification key does not match/
+    );
   });
 });
 
@@ -309,5 +313,80 @@ describe("type-level stability — input accepts optional fields", () => {
     const adapter = new MockProofVerifierAdapter();
     const result = await adapter.verify(input);
     expect(result.status).toBe(ProofVerificationStatus.VALID);
+  });
+});
+
+describe("verification key mismatch — reported distinctly from invalid", () => {
+  it("returns KEY_MISMATCH when the proof names a different key than the adapter holds", async () => {
+    const adapter = new MockProofVerifierAdapter({ verificationKeyId: "payroll-v2" });
+    const result = await adapter.verify({ proof: VALID_PROOF, verificationKeyId: "payroll-v1" });
+    expect(result.status).toBe(ProofVerificationStatus.KEY_MISMATCH);
+    expect(result.status).not.toBe(ProofVerificationStatus.INVALID);
+    expect(result.isValid).toBe(false);
+    expect(result.message).toMatch(/verification key does not match/);
+  });
+
+  it("does not echo either key id in the result message", async () => {
+    const adapter = new MockProofVerifierAdapter({ verificationKeyId: "secret-key-a" });
+    const result = await adapter.verify({ proof: VALID_PROOF, verificationKeyId: "secret-key-b" });
+    expect(result.message).not.toContain("secret-key");
+  });
+
+  it("verifies normally when the key ids match", async () => {
+    const adapter = new MockProofVerifierAdapter({ verificationKeyId: "payroll-v1" });
+    const result = await adapter.verify({ proof: VALID_PROOF, verificationKeyId: "payroll-v1" });
+    expect(result.status).toBe(ProofVerificationStatus.VALID);
+  });
+
+  it("skips the key check when either side does not name a key", async () => {
+    const configured = new MockProofVerifierAdapter({ verificationKeyId: "payroll-v1" });
+    expect((await configured.verify({ proof: VALID_PROOF })).status).toBe(
+      ProofVerificationStatus.VALID
+    );
+    const unconfigured = new MockProofVerifierAdapter();
+    expect(
+      (await unconfigured.verify({ proof: VALID_PROOF, verificationKeyId: "payroll-v1" })).status
+    ).toBe(ProofVerificationStatus.VALID);
+  });
+
+  it("keeps a malformed proof as MALFORMED even when the keys differ", async () => {
+    const adapter = new MockProofVerifierAdapter({ verificationKeyId: "a" });
+    const result = await adapter.verify({
+      proof: { proof: {}, publicSignals: [] } as unknown as ProofPayload,
+      verificationKeyId: "b",
+    });
+    expect(result.status).toBe(ProofVerificationStatus.MALFORMED);
+  });
+
+  it.each([
+    "Verification key mismatch",
+    "vk mismatch detected",
+    "the verification key does not match the circuit",
+    "wrong verification key supplied",
+    "VERIFICATION_KEY_MISMATCH",
+  ])("normalizes %p to PROOF_VERIFICATION_KEY_MISMATCH", (message) => {
+    const normalized = normalizeProofVerificationError(new Error(message));
+    expect(normalized.code).toBe(ProofVerificationErrorCode.VERIFICATION_KEY_MISMATCH);
+    expect(normalized).toBeInstanceOf(ProofVerificationError);
+  });
+
+  it("keeps generic and unavailable failures on their own codes", () => {
+    expect(normalizeProofVerificationError(new Error("boom")).code).toBe(
+      ProofVerificationErrorCode.VERIFICATION_FAILED
+    );
+    expect(normalizeProofVerificationError(new Error("service unavailable")).code).toBe(
+      ProofVerificationErrorCode.VERIFIER_UNAVAILABLE
+    );
+  });
+
+  it("surfaces KEY_MISMATCH through ProofVerificationClient", async () => {
+    const client = new ProofVerificationClient(
+      new MockProofVerifierAdapter({ verificationKeyId: "payroll-v2" })
+    );
+    const result = await client.verifyProof({
+      proof: VALID_PROOF,
+      verificationKeyId: "payroll-v1",
+    });
+    expect(result.status).toBe("key_mismatch");
   });
 });

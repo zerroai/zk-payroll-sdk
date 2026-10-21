@@ -168,6 +168,14 @@ export const ERROR_CODE_REGISTRY: Record<string, ErrorCodeEntry> = {
     retryable: false,
     suggestedMessage: "The proof payload is malformed. Regenerate the proof and try again.",
   },
+  PROOF_VERIFICATION_KEY_MISMATCH: {
+    category: ErrorCategory.PROOF,
+    meaning:
+      "The proof was checked against a different verification key than the one it was generated for (wrong circuit version or key configuration) — the proof itself is not necessarily invalid.",
+    retryable: false,
+    suggestedMessage:
+      "The verification key does not match this proof. Check the circuit version and verification key configuration, then verify again.",
+  },
 
   // ── Contract Execution ──────────────────────────────────────────────────
   SIMULATION_FAILED: {
@@ -305,6 +313,13 @@ export const ERROR_CODE_REGISTRY: Record<string, ErrorCodeEntry> = {
   },
 
   // ── Proof Input Sanitization ────────────────────────────────────────────
+  PROOF_INPUT_TOO_LARGE: {
+    category: ErrorCategory.PROOF,
+    meaning:
+      "Proof witness exceeds the circuit input size limits (field count, element count, nesting depth, string length or total size) and was rejected before proof generation.",
+    retryable: false,
+    suggestedMessage: "The proof input is too large. Reduce the witness size and try again.",
+  },
   PROOF_INPUT_INVALID_RECIPIENT: {
     category: ErrorCategory.PROOF,
     meaning: "Proof witness recipient field is not a valid string.",

@@ -128,6 +128,11 @@ export interface ProofGeneratorConfig {
    * Same-witness requests are deduplicated regardless of this setting.
    */
   maxConcurrency?: number;
+  /**
+   * Overrides for the witness size limits checked before proof generation.
+   * See `DEFAULT_CIRCUIT_INPUT_LIMITS`.
+   */
+  circuitInputLimits?: Partial<import("../proofs/circuitInputSize").CircuitInputLimits>;
 }
 
 /**

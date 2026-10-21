@@ -342,6 +342,7 @@ export const DEFAULT_ERROR_MESSAGES: Record<string, string> = {
   PROOF_INPUT_FORBIDDEN_FIELD: "The proof input contains a forbidden sensitive field.",
   PROOF_INPUT_MISSING_REQUIRED_FIELD: "A required field is missing from the payroll proof input.",
   PROOF_INPUT_INVALID: "Proof witness must be a non-null object.",
+  PROOF_INPUT_TOO_LARGE: "The proof input is too large. Reduce the witness size and try again.",
   AUDIT_ACCESS_REQUEST_VALIDATION_FAILED:
     "The audit access request failed validation. Please review the requester details, scope, expiration, reason, and target payroll period.",
 };
@@ -484,6 +485,7 @@ const CATEGORY_MAP: Record<string, string> = {
   PROOF_INPUT_FORBIDDEN_FIELD: "Proof Generation",
   PROOF_INPUT_MISSING_REQUIRED_FIELD: "Proof Generation",
   PROOF_INPUT_INVALID: "Proof Generation",
+  PROOF_INPUT_TOO_LARGE: "Proof Generation",
   RECONCILIATION_DIFF_FAILED: "Reconciliation",
   RECONCILIATION_UNEXPECTED_ACTIVITY: "Reconciliation",
   AUDIT_ACCESS_REQUEST_VALIDATION_FAILED: "Audit",

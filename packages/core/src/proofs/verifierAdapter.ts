@@ -46,6 +46,8 @@ export function proofVerificationMessage(status: ProofVerificationStatusType): s
       return "Proof verification unavailable: the verifier is not reachable. Please retry later.";
     case ProofVerificationStatus.MALFORMED:
       return "Proof verification failed: the proof payload is malformed.";
+    case ProofVerificationStatus.KEY_MISMATCH:
+      return "Proof verification failed: the verification key does not match the key this proof was generated for. Check the circuit version and verification key configuration.";
     default:
       return "Proof verification returned an unknown status.";
   }
@@ -94,6 +96,12 @@ export interface MockProofVerifierAdapterOptions {
    * error handling without a real network.
    */
   failWith?: unknown;
+  /**
+   * Verification key id this adapter is configured with. When set and
+   * `input.verificationKeyId` is provided and differs, `verify()` returns
+   * `key_mismatch` instead of `invalid`.
+   */
+  verificationKeyId?: string;
   /** Clock for expiry checks. Defaults to `Date.now`. */
   now?: () => number;
 }
@@ -105,6 +113,7 @@ export interface MockProofVerifierAdapterOptions {
  * verification states:
  * - structurally invalid payloads → `malformed`
  * - `input.expiresAt` in the past → `expired`
+ * - `input.verificationKeyId` differing from the configured key → `key_mismatch`
  * - everything else → `defaultStatus` (`valid` by default)
  *
  * This is also the default adapter used by {@link ProofVerificationClient} when
@@ -136,6 +145,15 @@ export class MockProofVerifierAdapter implements ProofVerifierAdapter {
 
     if (typeof input.expiresAt === "number" && this.now() > input.expiresAt) {
       return this.buildResult(ProofVerificationStatus.EXPIRED, verifiedAt);
+    }
+
+    const { verificationKeyId: configuredKey } = this.options;
+    if (
+      configuredKey !== undefined &&
+      input.verificationKeyId !== undefined &&
+      input.verificationKeyId !== configuredKey
+    ) {
+      return this.buildResult(ProofVerificationStatus.KEY_MISMATCH, verifiedAt);
     }
 
     return this.buildResult(this.options.defaultStatus, verifiedAt);
@@ -177,6 +195,19 @@ const UNAVAILABLE_PATTERNS: RegExp[] = [
   /timeout|timed\s*out/i,
 ];
 
+/**
+ * Patterns that indicate the proof was checked against the wrong verification
+ * key (as opposed to the proof being invalid). Matched before the generic
+ * failure fallback.
+ */
+const KEY_MISMATCH_PATTERNS: RegExp[] = [
+  /(?:vk|verification\s+key)\s+mismatch/i,
+  /(?:vk|verification\s+key)\s+(?:does\s+not|doesn'?t)\s+match/i,
+  /mismatched\s+verification\s+key/i,
+  /wrong\s+verification\s+key/i,
+  /VERIFICATION_KEY_MISMATCH|VK_MISMATCH/,
+];
+
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -194,6 +225,8 @@ function errorMessage(error: unknown): string {
  * - Already-SDK errors (`instanceof ZkPayrollError`) are returned unchanged.
  * - Errors whose message indicates the verifier was unreachable map to
  *   {@link ProofVerificationErrorCode.VERIFIER_UNAVAILABLE}.
+ * - Errors whose message names a verification key mismatch map to
+ *   {@link ProofVerificationErrorCode.VERIFICATION_KEY_MISMATCH}.
  * - Everything else maps to {@link ProofVerificationErrorCode.VERIFICATION_FAILED}.
  *
  * The original error is preserved as `cause`, and `context` is attached for
@@ -206,9 +239,11 @@ export function normalizeProofVerificationError(
   if (error instanceof ZkPayrollError) return error;
 
   const message = errorMessage(error);
-  const code = UNAVAILABLE_PATTERNS.some((re) => re.test(message))
-    ? ProofVerificationErrorCode.VERIFIER_UNAVAILABLE
-    : ProofVerificationErrorCode.VERIFICATION_FAILED;
+  const code = KEY_MISMATCH_PATTERNS.some((re) => re.test(message))
+    ? ProofVerificationErrorCode.VERIFICATION_KEY_MISMATCH
+    : UNAVAILABLE_PATTERNS.some((re) => re.test(message))
+      ? ProofVerificationErrorCode.VERIFIER_UNAVAILABLE
+      : ProofVerificationErrorCode.VERIFICATION_FAILED;
 
   const safeMessage = message
     ? `Proof verification failed: ${message}`

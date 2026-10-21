@@ -56,7 +56,10 @@ import type { ViewKeyScope } from "./viewKeyHelpers";
  * Every scope the contract accepts, ordered from narrowest to widest.
  * Index in this tuple is the scope's privilege rank.
  */
-export const AUDIT_GRANT_SCOPES = ["read-only", "full-audit"] as const;
+export const AUDIT_GRANT_SCOPES: readonly ViewKeyScope[] = Object.freeze([
+  "read-only",
+  "full-audit",
+] as const);
 
 /** Widest-first ranking of audit scopes; used to pick the effective scope. */
 const SCOPE_RANK: Readonly<Record<ViewKeyScope, number>> = {
@@ -74,19 +77,19 @@ const SCOPE_RANK: Readonly<Record<ViewKeyScope, number>> = {
  */
 export interface AuditGrantRecord {
   /** Stable grant identifier, unique across the supplied set. */
-  grantId: string;
+  readonly grantId: string;
   /** Auditor the access was granted to (Stellar public key or auditor id). */
-  grantee: string;
+  readonly grantee: string;
   /** Scope requested at grant time — the contract's `ViewKeyScope` enum. */
-  scope: ViewKeyScope;
+  readonly scope: ViewKeyScope;
   /** Stellar public key of the admin that issued the grant. */
-  grantedBy: string;
+  readonly grantedBy: string;
   /** ISO-8601 timestamp the grant was issued. */
-  grantedAt: string;
+  readonly grantedAt: string;
   /** ISO-8601 timestamp the grant stops being usable. */
-  expiresAt: string;
+  readonly expiresAt: string;
   /** ISO-8601 timestamp of an explicit revocation; absent when never revoked. */
-  revokedAt?: string | null;
+  readonly revokedAt?: string | null;
 }
 
 /** Lifecycle state of one grant at a reference time. */
@@ -104,57 +107,57 @@ export type AuditGrantLifecycleState = "active" | "expired" | "revoked" | "none"
 
 /** A single grant with its lifecycle state resolved at a reference time. */
 export interface ResolvedAuditGrant {
-  grantId: string;
+  readonly grantId: string;
   /** Scope exactly as granted — never widened by this reader. */
-  scope: ViewKeyScope;
-  state: AuditGrantState;
-  grantedBy: string;
-  grantedAt: string;
-  expiresAt: string;
-  revokedAt?: string;
+  readonly scope: ViewKeyScope;
+  readonly state: AuditGrantState;
+  readonly grantedBy: string;
+  readonly grantedAt: string;
+  readonly expiresAt: string;
+  readonly revokedAt?: string;
   /** Privilege rank of `scope`; higher means broader. */
-  scopeRank: number;
+  readonly scopeRank: number;
   /** Milliseconds until expiry; negative once elapsed. `null` when revoked. */
-  remainingMs: number | null;
+  readonly remainingMs: number | null;
 }
 
 /** Effective audit access for a single grantee. */
 export interface EffectiveAuditGrant {
   /** Grantee the entry describes (unmasked; mask before logging). */
-  grantee: string;
+  readonly grantee: string;
   /** Masked grantee, safe for logs, UI, and telemetry. */
-  redactedGrantee: string;
+  readonly redactedGrantee: string;
   /**
    * Widest scope among grants that are active at the reference time, or
    * `null` when no grant is live. Never `null` while `state` is `"active"`.
    */
-  scope: ViewKeyScope | null;
+  readonly scope: ViewKeyScope | null;
   /** Effective lifecycle state for this grantee. */
-  state: AuditGrantLifecycleState;
+  readonly state: AuditGrantLifecycleState;
   /** Every supplied grant for this grantee, ordered by `grantedAt` ascending. */
-  grants: ResolvedAuditGrant[];
+  readonly grants: readonly ResolvedAuditGrant[];
   /** Ids of the grants that produced `scope`. */
-  activeGrantIds: string[];
+  readonly activeGrantIds: readonly string[];
   /** Total grants supplied for this grantee, including lapsed ones. */
-  grantCount: number;
+  readonly grantCount: number;
   /** Timestamp of the most recent lifecycle change, or `null` if never granted. */
-  latestChangeAt: string | null;
+  readonly latestChangeAt: string | null;
   /** Privacy-safe single-line summary; addresses are masked. */
-  message: string;
+  readonly message: string;
 }
 
 /** Effective audit access across every grantee present in the grant set. */
 export interface AuditGrantScopeReport {
   /** True only when **every** grantee has at least one active grant. */
-  allGranteesActive: boolean;
+  readonly allGranteesActive: boolean;
   /** Per-grantee entries, deterministically sorted by grantee. */
-  grantees: EffectiveAuditGrant[];
+  readonly grantees: readonly EffectiveAuditGrant[];
   /** Grantees whose `state` is `"active"`, in report order. */
-  activeGrantees: EffectiveAuditGrant[];
+  readonly activeGrantees: readonly EffectiveAuditGrant[];
   /** Grantees with no live grant, in report order. */
-  inactiveGrantees: EffectiveAuditGrant[];
+  readonly inactiveGrantees: readonly EffectiveAuditGrant[];
   /** Privacy-safe summary naming every grantee without live access. */
-  message: string;
+  readonly message: string;
 }
 
 /** Stable codes for audit grant scope reader input validation failures. */
@@ -314,13 +317,13 @@ export function readEffectiveAuditGrantScope(
         : `${inactiveGrantees.length} of ${grantees.length} grantee(s) have no live audit access: ` +
           inactiveGrantees.map((entry) => entry.redactedGrantee).join(", ");
 
-  return {
+  return Object.freeze({
     allGranteesActive: inactiveGrantees.length === 0,
-    grantees,
-    activeGrantees,
-    inactiveGrantees,
+    grantees: Object.freeze(grantees),
+    activeGrantees: Object.freeze(activeGrantees),
+    inactiveGrantees: Object.freeze(inactiveGrantees),
     message,
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -468,17 +471,17 @@ function buildEffectiveGrant(
   const scope = selectWidestAuditScope(active.map((grant) => grant.scope));
   const state = resolveLifecycleState(grants, active.length);
 
-  return {
+  return Object.freeze({
     grantee,
     redactedGrantee: redactAuditorId(grantee),
     scope,
     state,
-    grants,
-    activeGrantIds: active.map((grant) => grant.grantId),
+    grants: Object.freeze(grants.map((grant) => Object.freeze(grant))),
+    activeGrantIds: Object.freeze(active.map((grant) => grant.grantId)),
     grantCount: grants.length,
     latestChangeAt: latestChangeAt(grants),
     message: buildMessage(grantee, state, scope, active),
-  };
+  });
 }
 
 /**

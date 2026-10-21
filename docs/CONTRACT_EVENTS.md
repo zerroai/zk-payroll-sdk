@@ -86,6 +86,7 @@ the exact emission history.
 | [`committed`](#committed) | Payroll | `commit_salary` | `[name, employer, employee]` | `commitment_hash (bytes)`, `cycle_id (u64)` | ABI `0.1.0` (assumed) |
 | [`salary_revealed`](#salary_revealed) | Payroll | `reveal_salary` | `[name, employer, employee]` | `cycle_id (u64)`, `actual_amount (i128)` | ABI `0.1.0` (assumed) |
 | [`payroll_draft_expiry`](#payroll_draft_expiry) | Payroll | (draft lifecycle) | `[name, employer]` | `draft_id (string)`, `expiry_timestamp (u64)`, `expired_at (u64)`, `auto_cleaned (bool)` | ABI `0.1.0` (assumed) |
+| [`payroll_cancelled`](#payroll_cancelled) | Payroll | (run lifecycle) | `[name, employer]` | `run_id (string)`, `reason (symbol/string)`, `cancelled_by (address, optional)`, `cancelled_at (u64)` | ABI `0.1.0` (assumed) |
 | [`payment_executed`](#payment_executed) | Treasury | `execute_payment` | `[name, recipient]` | `amount (i128)`, `asset (address)`, `tx_hash (bytes)` | ABI `0.1.0` (assumed) |
 | [`payment_scheduled`](#payment_scheduled) | Treasury | `schedule_payment` | `[name, recipient]` | `amount (i128)`, `asset (address)`, `execute_at (u64)`, `payment_id (u64)` | ABI `0.1.0` (assumed) |
 | [`payment_cancelled`](#payment_cancelled) | Treasury | `cancel_payment` | `[name]`¹ | `payment_id (u64)` | ABI `0.1.0` (assumed) |
@@ -398,6 +399,60 @@ cleanup workflow; indexer lifecycle tracking; compliance audit trails.
 > ⚠ **Privacy note:** This event does not expose sensitive payroll values
 > (amounts, salaries, keys). It only contains draft identifiers and timestamps,
 > making it safe to log and display in audit contexts.
+
+---
+
+#### `payroll_cancelled`
+
+> Source: Payroll run lifecycle (cancellation)  
+> Severity: `warning` — `category = "payroll"`
+
+A payroll run was cancelled. The SDK decodes it with
+`parsePayrollCancelledEvent()` into a `PayrollCancelledEvent`.
+
+**Topics** (2 positions):
+
+|| Pos | ScVal Type | Field | Description |
+||---|---|---|---|
+|| 0 | `ScValSymbol` | event name | `"payroll_cancelled"` |
+|| 1 | `ScValAddress` | `employer` | Stellar public key of the employer whose run was cancelled |
+
+**Data** (`ScValMap`):
+
+|| Key | ScVal Type | Decoded JS Type | Description |
+||---|---|---|---|
+|| `run_id` | `ScValString` | `string` | Identifier of the cancelled run (required) |
+|| `reason` | `ScValSymbol` or `ScValString` | `CancellationReasonCode` | One of the codes in `CANCELLATION_REASONS`. Unknown codes decode as `"other"` with `reasonRecognized: false` and the original code in `rawReason` |
+|| `cancelled_by` | `ScValAddress` | `string \| undefined` | Address that cancelled the run, when recorded |
+|| `cancelled_at` | `ScValU64` | `number` | Unix timestamp (seconds); must be non-zero |
+
+**Example (decoded):**
+
+```json
+{
+  "type": "payroll_cancelled",
+  "employer": "GAEMPLOYER1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+  "runId": "run_2026_10",
+  "reason": "compliance_hold",
+  "rawReason": "compliance_hold",
+  "reasonRecognized": true,
+  "cancelledBy": "GACANCELLER1234567890ABCDEFGHIJKLMNOPQRSTUVW",
+  "cancelledAt": 1700003600,
+  "ledger": 321,
+  "timestamp": "2026-10-21T00:00:00Z"
+}
+```
+
+**Consumers:** SDK parser → `PayrollCancelledEvent`; dashboard run history;
+indexer lifecycle tracking.
+
+Failures throw `EventDecodingError` naming only the missing field. Use
+`parsePayrollCancelledEvents()` to decode a mixed stream (non-matching events
+are skipped) and `isPayrollCancelledEvent()` to filter without throwing.
+
+> ⚠ **Privacy note:** The decoder reads only the run id, reason code, canceller
+> and timestamp. Amounts, recipients and any free-form notes the contract may
+> attach are ignored, so decoded events and errors are safe to log.
 
 ---
 

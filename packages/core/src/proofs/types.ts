@@ -16,6 +16,10 @@ import type { ProofPayload } from "../crypto/IProofGenerator";
  *                   should return it instead of throwing.
  * - `malformed`   — the proof payload is structurally invalid (missing/incorrect
  *                   pi_a/pi_b/pi_c or publicSignals shape).
+ * - `key_mismatch` — the proof was checked against a different verification key
+ *                   than the one it was generated for. Not the same as `invalid`:
+ *                   the proof may be fine, but the verifier is configured with
+ *                   the wrong key or circuit version.
  */
 export const ProofVerificationStatus = {
   VALID: "valid",
@@ -23,6 +27,7 @@ export const ProofVerificationStatus = {
   EXPIRED: "expired",
   UNAVAILABLE: "unavailable",
   MALFORMED: "malformed",
+  KEY_MISMATCH: "key_mismatch",
 } as const;
 
 export type ProofVerificationStatus =
